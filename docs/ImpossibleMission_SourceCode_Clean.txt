@@ -1,0 +1,1761 @@
+================================================================
+  IMPOSSIBLE MISSION — Java University Edition
+  Codice sorgente del motore ECS (versione pulita)
+================================================================
+
+
+--- FILE: src/App.java ---
+package src;
+
+import controller.core.Flow;
+import model.data.Config;
+import model.phase.PhaseManager;
+import model.phase.menu.MenuPhase;
+import model.service.Engine;
+import model.service.SceneLoader;
+import view.component.Frame;
+import view.component.Panel;
+
+/**
+ * Classe principale di avvio dell'applicazione (Entry Point).
+ * Responsabile dell'assemblaggio architetturale tramite Dependency Injection manuale.
+ * Configura il pattern Model-View-Controller istanziando i motori logici,
+ * i servizi di caricamento e la finestra grafica prima di innescare il Loop Principale.
+ */
+public class App {
+
+    public static void main(String[] args) {
+
+        System.out.println("[System] Inizializzazione del Motore ECS in corso...");
+
+        // ── 1. MODELLO (Logica e Dati) ────────────────────────────────────────
+        Engine engine           = new Engine();
+        SceneLoader sceneLoader = new SceneLoader();
+
+        // ── 2. VISTA (Grafica e Interfaccia) ──────────────────────────────────
+        Panel panel = new Panel(Config.WINDOW_WIDTH, Config.WINDOW_HEIGHT);
+        Frame frame = new Frame(panel);
+
+        // ── 3. CONTROLLER DI STATO (Macchina a Stati Gerarchica) ──────────────
+        PhaseManager phaseManager = new PhaseManager(engine, panel, sceneLoader);
+        MenuPhase initialPhase    = new MenuPhase(phaseManager);
+        phaseManager.changePhase(initialPhase);
+
+        // ── 4. AVVIO DEL FLUSSO (Main Loop) ───────────────────────────────────
+        Flow flow = new Flow(phaseManager);
+        System.out.println("[System] Setup completato. Avvio del Main Loop...");
+        flow.startLoop();
+    }
+}
+
+
+--- FILE: src/controller/core/Flow.java ---
+package controller.core;
+
+import model.data.Config;
+import model.event.EventManager;
+import model.phase.PhaseManager;
+import model.scene.Scene;
+import model.service.TimeManager;
+
+/**
+ * Gestore del ciclo di vita principale dell'applicazione (Main Loop).
+ * Implementa Runnable per l'esecuzione asincrona su un Thread dedicato.
+ * Calcola il Delta Time, aggiorna le metriche globali tramite TimeManager,
+ * orchestra il motore logico (Engine), propaga gli eventi e aggiorna la grafica (Panel).
+ */
+public class Flow implements Runnable {
+
+    private Thread thread;
+    private final PhaseManager phaseManager;
+    private final TimeManager timeManager;
+    private boolean running;
+
+    public Flow(PhaseManager phaseManager) {
+        this.phaseManager = phaseManager;
+        this.timeManager  = TimeManager.getInstance();
+        this.running      = false;
+    }
+
+    public void startLoop() {
+        if (this.thread == null) {
+            this.running = true;
+            this.thread  = new Thread(this);
+            this.thread.start();
+        }
+    }
+
+    public void stopLoop() {
+        this.running = false;
+    }
+
+    @Override
+    public void run() {
+        long lastTime = System.nanoTime();
+        long currentTime, elapsedTime;
+        long timer = System.currentTimeMillis();
+        int  frames = 0;
+
+        while (this.running) {
+            currentTime  = System.nanoTime();
+            elapsedTime  = currentTime - lastTime;
+
+            if (elapsedTime >= Config.TARGET_TIME_NS) {
+
+                double deltaTime = elapsedTime / 1_000_000_000.0;
+
+                // 1. Aggiornamento dati temporali
+                this.timeManager.updateTimeData(deltaTime, frames);
+
+                // 2. Battito Logico: l'Engine aggiorna la logica della scena
+                this.phaseManager.getEngine().update();
+
+                // 3. Smistamento Eventi
+                EventManager.getInstance().processPendingEvents();
+
+                // 4. Ponte Model → View
+                Scene activeScene = this.phaseManager.getEngine().getActiveScene();
+                this.phaseManager.getPanel().setEntities(
+                    activeScene != null ? activeScene.getEntities() : null
+                );
+
+                // 5. Battito Grafico
+                this.phaseManager.getPanel().repaint();
+
+                lastTime = currentTime;
+                frames++;
+
+            } else {
+                try { Thread.sleep(1); }
+                catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            }
+
+            if (System.currentTimeMillis() - timer > 1000) {
+                timer += 1000;
+                frames = 0;
+            }
+        }
+    }
+}
+
+
+--- FILE: src/controller/core/InputHandler.java ---
+package controller.core;
+
+public class InputHandler {
+    // TODO: implementazione futura
+}
+
+
+--- FILE: src/controller/context/MenuController.java ---
+package controller.context;
+
+public class MenuController {
+    // TODO: implementazione futura
+}
+
+
+--- FILE: src/controller/util/InputController.java ---
+package controller.util;
+
+public class InputController {
+    // TODO: implementazione futura
+}
+
+
+--- FILE: src/controller/input/EventManager.java ---
+package controller.input;
+
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
+import java.util.Observable;
+
+/**
+ * Singleton KeyListener.
+ * Mappa lo stato fisico dei tasti in un array booleano[256] e notifica
+ * gli Observer registrati ad ogni cambio di stato.
+ */
+@SuppressWarnings("deprecation")
+public class EventManager extends Observable implements KeyListener {
+
+    private static EventManager instance;
+    private final boolean[] keys;
+
+    private EventManager() {
+        this.keys = new boolean[256];
+    }
+
+    public static EventManager getInstance() {
+        if (instance == null) instance = new EventManager();
+        return instance;
+    }
+
+    public boolean isKeyPressed(int keyCode) {
+        if (keyCode < 0 || keyCode >= this.keys.length) return false;
+        return this.keys[keyCode];
+    }
+
+    @Override
+    public void keyPressed(KeyEvent e) {
+        int code = e.getKeyCode();
+        if (code >= 0 && code < this.keys.length) {
+            this.keys[code] = true;
+            setChanged();
+            notifyObservers(e);
+        }
+    }
+
+    @Override
+    public void keyReleased(KeyEvent e) {
+        int code = e.getKeyCode();
+        if (code >= 0 && code < this.keys.length) {
+            this.keys[code] = false;
+            setChanged();
+            notifyObservers(e);
+        }
+    }
+
+    @Override
+    public void keyTyped(KeyEvent e) { }
+
+    public void resetKeys() {
+        for (int i = 0; i < this.keys.length; i++) this.keys[i] = false;
+    }
+}
+
+
+--- FILE: src/model/component/Component.java ---
+package model.component;
+
+/**
+ * Marker Interface radice per tutti i componenti del motore ECS.
+ */
+public interface Component { }
+
+
+--- FILE: src/model/component/logic/Updatable.java ---
+package model.component.logic;
+
+/**
+ * Contratto per i componenti con logica ciclica.
+ * L'Engine chiama update() su tutti gli Updatable ad ogni frame.
+ */
+public interface Updatable {
+    void update();
+}
+
+
+--- FILE: src/model/component/logic/primitive/Primitive.java ---
+package model.component.logic.primitive;
+
+import model.component.Component;
+import model.component.logic.Updatable;
+
+/**
+ * Contratto base per i blocchi logici elementari (Primitive).
+ */
+public interface Primitive extends Component, Updatable { }
+
+
+--- FILE: src/model/component/logic/behavior/AbstractBehavior.java ---
+package model.component.logic.behavior;
+
+import model.component.Component;
+import model.component.logic.Updatable;
+
+/**
+ * Classe base astratta per tutti i comportamenti complessi (Behavior).
+ * Gestisce il flag active per abilitare/disabilitare la logica a runtime.
+ */
+public abstract class AbstractBehavior implements Component, Updatable {
+
+    protected boolean active;
+
+    public AbstractBehavior() { this.active = true; }
+
+    public boolean isActive()             { return this.active; }
+    public void setActive(boolean active) { this.active = active; }
+}
+
+
+--- FILE: src/model/component/logic/behavior/process/TimerEventBehavior.java ---
+package model.component.logic.behavior.process;
+
+import model.component.Component;
+import model.component.logic.Updatable;
+import model.entity.Entity;
+import model.event.EventManager;
+import model.event.EventMessage;
+import model.event.EventType;
+import model.service.TimeManager;
+
+/**
+ * Conto alla rovescia invisibile.
+ * Accumula deltaTime e, raggiunta la soglia, spedisce un EventMessage
+ * sull'Event Bus e si auto-disattiva.
+ */
+public class TimerEventBehavior implements Component, Updatable {
+
+    private final Entity sender;
+    private final double targetTimeInSeconds;
+    private final EventType eventType;
+    private double accumulatedTime;
+    private boolean active;
+
+    public TimerEventBehavior(Entity sender, long durationMs, EventType eventType) {
+        this.sender              = sender;
+        this.targetTimeInSeconds = durationMs / 1000.0;
+        this.eventType           = eventType;
+        this.accumulatedTime     = 0.0;
+        this.active              = true;
+    }
+
+    @Override
+    public void update() {
+        if (this.active) {
+            double dt = TimeManager.getInstance().getDeltaTime();
+            this.accumulatedTime += dt;
+
+            if (this.accumulatedTime >= this.targetTimeInSeconds) {
+                this.active = false;
+                System.out.println("[TimerEventBehavior] Tempo scaduto! Spedisco: " + this.eventType);
+                EventManager.getInstance().enqueue(new EventMessage(this.eventType, this.sender));
+            }
+        }
+    }
+}
+
+
+--- FILE: src/model/component/logic/behavior/ui/SpinnerBehavior.java ---
+package model.component.logic.behavior.ui;
+
+import model.component.logic.behavior.AbstractBehavior;
+import model.component.logic.primitive.math.Counter;
+import model.component.logic.primitive.spatial.Rotator;
+import model.component.spatial.Transform;
+
+/**
+ * Comportamento per l'animazione di caricamento rotante (Spinner).
+ * Assembla internamente Counter (segnale angolare) e Rotator (applica al Transform).
+ */
+public class SpinnerBehavior extends AbstractBehavior {
+
+    private final Counter rotationSignal;
+    private final Rotator rotationActuator;
+
+    public SpinnerBehavior(Transform targetTransform, double speed) {
+        super();
+        this.rotationSignal   = new Counter(360.0, speed, 0.0);
+        this.rotationActuator = new Rotator(this.rotationSignal, targetTransform);
+    }
+
+    @Override
+    public void update() {
+        if (this.active) {
+            this.rotationSignal.update();
+            this.rotationActuator.update();
+        }
+    }
+}
+
+
+--- FILE: src/model/component/logic/primitive/math/Counter.java ---
+package model.component.logic.primitive.math;
+
+import model.component.logic.primitive.Primitive;
+import model.service.TimeManager;
+
+/**
+ * Primitivo generatore di segnale numerico ciclico.
+ * Cresce nel tempo con deltaTime e si azzera raggiunto il limite.
+ */
+public class Counter implements Primitive {
+
+    private final double limit;
+    private final double speed;
+    private double value;
+
+    public Counter(double limit, double speed, double start) {
+        this.limit = limit;
+        this.speed = speed;
+        this.value = start;
+    }
+
+    @Override
+    public void update() {
+        double dt  = TimeManager.getInstance().getDeltaTime();
+        this.value = (this.value + (this.speed * dt)) % this.limit;
+    }
+
+    public double getValue() { return this.value; }
+}
+
+
+--- FILE: src/model/component/logic/primitive/spatial/Rotator.java ---
+package model.component.logic.primitive.spatial;
+
+import model.component.logic.primitive.Primitive;
+import model.component.logic.primitive.math.Counter;
+import model.component.spatial.Transform;
+
+/**
+ * Primitivo ponte (cablaggio).
+ * Legge il valore dal Counter e lo scrive nel parametro rotation del Transform.
+ */
+public class Rotator implements Primitive {
+
+    private final Counter   input;
+    private final Transform output;
+
+    public Rotator(Counter input, Transform output) {
+        this.input  = input;
+        this.output = output;
+    }
+
+    @Override
+    public void update() {
+        if (this.input != null && this.output != null)
+            this.output.setRotation(this.input.getValue());
+    }
+}
+
+
+--- FILE: src/model/component/spatial/Transform.java ---
+package model.component.spatial;
+
+import model.component.Component;
+
+/**
+ * Componente spaziale fondamentale.
+ * Contiene posizione (x, y), rotazione e scala dell'entità nel mondo di gioco.
+ */
+public class Transform implements Component {
+
+    private double x, y, rotation, scale;
+
+    public Transform(double x, double y, double rotation, double scale) {
+        this.x = x; this.y = y; this.rotation = rotation; this.scale = scale;
+    }
+
+    public Transform(double x, double y, double rotation) {
+        this(x, y, rotation, 1.0);
+    }
+
+    public double getX()        { return x; }
+    public void   setX(double x){ this.x = x; }
+
+    public double getY()        { return y; }
+    public void   setY(double y){ this.y = y; }
+
+    public double getRotation()           { return rotation; }
+    public void   setRotation(double r)   { this.rotation = r; }
+
+    public double getScale()              { return scale; }
+    public void   setScale(double s)      { this.scale = s; }
+}
+
+
+--- FILE: src/model/component/data/IdentityComponent.java ---
+package model.component.data;
+
+import model.component.Component;
+
+/**
+ * Fornisce un identificatore univoco all'entità.
+ */
+public class IdentityComponent implements Component {
+
+    private final String id;
+
+    public IdentityComponent(String id) { this.id = id; }
+    public String getId()               { return this.id; }
+}
+
+
+--- FILE: src/model/component/data/ImageReferenceComponent.java ---
+package model.component.data;
+
+import model.component.Component;
+
+/**
+ * Memorizza il percorso/chiave della risorsa visiva da caricare nell'ImageManager.
+ */
+public class ImageReferenceComponent implements Component {
+
+    private String imageId;
+
+    public ImageReferenceComponent(String textureId) { this.imageId = textureId; }
+    public String getImageId()                       { return this.imageId; }
+    public void   setImageId(String newImageId)      { this.imageId = newImageId; }
+}
+
+
+--- FILE: src/model/component/data/render/RenderLayer.java ---
+package model.component.data.render;
+
+/**
+ * Z-Index gerarchico per il rendering.
+ */
+public enum RenderLayer {
+    BACKGROUND,     // livello 0 – sfondi lontani
+    WORLD_BACK,     // livello 1 – elementi statici base (muri, pavimenti)
+    WORLD_ENTITY,   // livello 2 – attori dinamici (giocatore, robot)
+    WORLD_FRONT,    // livello 3 – oggetti che coprono gli attori (tetti)
+    UI_BASE,        // livello 4 – HUD, barre della vita
+    UI_OVERLAY0,    // livello 5 – menu di pausa, popup
+    UI_OVERLAY1     // livello 6 – icone di caricamento, transizioni
+}
+
+
+--- FILE: src/model/component/data/render/RenderLayerComponent.java ---
+package model.component.data.render;
+
+import model.component.Component;
+
+/**
+ * Assegna un livello Z-Index all'entità per l'ordinamento in fase di disegno.
+ */
+public class RenderLayerComponent implements Component {
+
+    private final RenderLayer layer;
+
+    public RenderLayerComponent(RenderLayer layer) { this.layer = layer; }
+    public RenderLayer getLayer()                  { return this.layer; }
+}
+
+
+--- FILE: src/model/component/visual/Drawable.java ---
+package model.component.visual;
+
+import model.component.data.render.RenderLayer;
+import java.awt.*;
+
+/**
+ * Contratto per i componenti visivi con rendering attivo.
+ */
+public interface Drawable {
+    void draw(Graphics2D g2d);
+    RenderLayer getLayer();
+    boolean isUIElement();
+}
+
+
+--- FILE: src/model/component/visual/filter/OpacityComponent.java ---
+package model.component.visual.filter;
+
+import model.component.Component;
+
+/**
+ * Gestisce il livello di trasparenza (canale Alpha) dell'entità.
+ */
+public class OpacityComponent implements Component {
+
+    private float alpha;
+
+    public OpacityComponent(float alpha) { this.setAlpha(alpha); }
+
+    public float getAlpha() { return this.alpha; }
+
+    public void setAlpha(float alpha) {
+        this.alpha = Math.max(0.0f, Math.min(1.0f, alpha));
+    }
+}
+
+
+--- FILE: src/model/component/visual/filter/ColorTintComponent.java ---
+package model.component.visual.filter;
+
+import model.component.Component;
+import java.awt.*;
+
+/**
+ * Applica una tinta cromatica (filtro colore) sull'elemento visivo.
+ */
+public class ColorTintComponent implements Component {
+
+    private Color tint;
+
+    public ColorTintComponent(Color tint) { this.tint = tint; }
+    public Color getTint()               { return this.tint; }
+    public void  setTint(Color tint)     { this.tint = tint; }
+}
+
+
+--- FILE: src/model/component/visual/media/pose/EntityPose.java ---
+package model.component.visual.media.pose;
+
+/**
+ * Marker Interface per gli stati visivi (pose) di un'entità.
+ */
+public interface EntityPose { }
+
+
+--- FILE: src/model/component/visual/media/pose/type/DefaultPose.java ---
+package model.component.visual.media.pose.type;
+
+import model.component.Component;
+import model.component.visual.media.pose.EntityPose;
+
+/**
+ * Posa per entità statiche senza transizioni di stato.
+ */
+public enum DefaultPose implements EntityPose, Component {
+    STATIC
+}
+
+
+--- FILE: src/model/component/visual/media/pose/type/RobotPose.java ---
+package model.component.visual.media.pose.type;
+
+import model.component.Component;
+import model.component.visual.media.pose.EntityPose;
+
+/**
+ * Pose specifiche per l'entità Robot.
+ */
+public enum RobotPose implements EntityPose, Component {
+    IDLE, WALKING, ATTACKING
+}
+
+
+--- FILE: src/model/component/visual/media/pose/PoseComponent.java ---
+package model.component.visual.media.pose;
+
+import model.component.Component;
+import java.util.Map;
+import java.util.Observable;
+import java.util.Observer;
+
+/**
+ * Macchina a stati per le animazioni.
+ * Mappa ogni EntityPose all'ID della sequenza animata corrispondente.
+ * È Observer dell'Entity e si aggiorna automaticamente ai cambi di posa.
+ */
+@SuppressWarnings("deprecation")
+public class PoseComponent implements Component, Observer {
+
+    private final Map<EntityPose, String> poseToSequenceMap;
+    private EntityPose currentPose;
+    private String activeSequenceId;
+
+    public PoseComponent(Map<EntityPose, String> poseToSequenceMap, EntityPose initialPose) {
+        this.poseToSequenceMap = poseToSequenceMap;
+        this.currentPose       = initialPose;
+        this.activeSequenceId  = this.poseToSequenceMap.get(initialPose);
+    }
+
+    public Map<EntityPose, String> getPoseToSequenceMap() { return this.poseToSequenceMap; }
+    public EntityPose getCurrentPose()                    { return this.currentPose; }
+    public String getActiveSequenceId()                   { return this.activeSequenceId; }
+
+    @Override
+    public void update(Observable o, Object arg) {
+        if (arg instanceof EntityPose) {
+            EntityPose newPose    = (EntityPose) arg;
+            this.currentPose      = newPose;
+            this.activeSequenceId = this.poseToSequenceMap.get(newPose);
+        }
+    }
+}
+
+
+--- FILE: src/model/component/visual/media/sequence/SequenceComponent.java ---
+package model.component.visual.media.sequence;
+
+import model.component.Component;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Definisce un'animazione sequenziale: lista di sprite, FPS, loop.
+ * Puro contenitore dati — la logica di avanzamento è nel futuro AnimationSystem.
+ */
+public class SequenceComponent implements Component {
+
+    private final String id;
+    private List<String> sprites;
+    private double fps, speed, time;
+    private int idx;
+    private boolean loop, playing;
+
+    public SequenceComponent(String id, double fps, boolean loop) {
+        this.id      = id;
+        this.sprites = new ArrayList<>();
+        this.fps     = fps;
+        this.speed   = 1.0;
+        this.time    = 0.0;
+        this.idx     = 0;
+        this.loop    = loop;
+        this.playing = true;
+    }
+
+    public String getId()         { return this.id; }
+    public List<String> getSprites() { return this.sprites; }
+    public void setSprites(List<String> sprites) { this.sprites = sprites; }
+    public void addSprite(String spriteId)        { this.sprites.add(spriteId); }
+
+    public double getFps()        { return this.fps; }
+    public void   setFps(double fps) { this.fps = fps; }
+    public double getSpeed()      { return this.speed; }
+    public void   setSpeed(double speed) { this.speed = speed; }
+    public double getTime()       { return this.time; }
+    public void   setTime(double time) { this.time = time; }
+    public int    getIdx()        { return this.idx; }
+    public void   setIdx(int idx) {
+        if (this.sprites != null && idx >= 0 && idx < this.sprites.size()) this.idx = idx;
+    }
+    public boolean isLoop()           { return this.loop; }
+    public void    setLoop(boolean l) { this.loop = l; }
+    public boolean isPlaying()            { return this.playing; }
+    public void    setPlaying(boolean p)  { this.playing = p; }
+
+    public String getCurSprite() {
+        if (this.sprites.isEmpty()) return null;
+        return this.sprites.get(this.idx);
+    }
+}
+
+
+--- FILE: src/model/component/visual/media/sprite/SpriteComponent.java ---
+package model.component.visual.media.sprite;
+
+import model.component.Component;
+import model.component.data.ImageReferenceComponent;
+import java.awt.*;
+
+/**
+ * Metadati di rendering di uno sprite: riferimento immagine, visibilità, opacità, filtro colore.
+ * Non contiene logica di disegno.
+ */
+public class SpriteComponent implements Component {
+
+    private final ImageReferenceComponent imageReference;
+    private boolean visible;
+    private float   opacity;
+    private Color   colorFilter;
+
+    public SpriteComponent(ImageReferenceComponent imageReference) {
+        this.imageReference = imageReference;
+        this.visible        = true;
+        this.opacity        = 1.0f;
+        this.colorFilter    = null;
+    }
+
+    public ImageReferenceComponent getImageReference()  { return this.imageReference; }
+    public boolean isVisible()                          { return this.visible; }
+    public void    setVisible(boolean visible)          { this.visible = visible; }
+    public float   getOpacity()                         { return this.opacity; }
+    public void    setOpacity(float opacity) {
+        if (opacity >= 0.0f && opacity <= 1.0f) this.opacity = opacity;
+    }
+    public Color getColorFilter()                       { return this.colorFilter; }
+    public void  setColorFilter(Color colorFilter)      { this.colorFilter = colorFilter; }
+}
+
+
+--- FILE: src/model/entity/Entity.java ---
+package model.entity;
+
+import model.component.Component;
+import model.component.data.IdentityComponent;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Contenitore universale ECS.
+ * Mappa tipizzata Class → Component; garantisce unicità del tipo per entità.
+ */
+public class Entity {
+
+    private final Map<Class<? extends Component>, Component> components;
+
+    public Entity(String id) {
+        this.components = new HashMap<>();
+        this.addComponent(new IdentityComponent(id));
+    }
+
+    public void addComponent(Component component) {
+        this.components.put(component.getClass(), component);
+    }
+
+    public <T extends Component> T getComponent(Class<T> componentClass) {
+        return componentClass.cast(this.components.get(componentClass));
+    }
+
+    public Collection<Component> getComponents() {
+        return this.components.values();
+    }
+
+    public String getId() {
+        return this.getComponent(IdentityComponent.class).getId();
+    }
+}
+
+
+--- FILE: src/model/scene/Scene.java ---
+package model.scene;
+
+import model.component.Component;
+import model.component.logic.Updatable;
+import model.entity.Entity;
+import java.util.*;
+
+/**
+ * Contenitore dinamico della scena attiva.
+ * Mantiene una Map delle Entity per ID e una lista cachedUpdatables
+ * per evitare scansioni ad ogni frame.
+ */
+public class Scene {
+
+    private final Map<String, Entity> entityMap;
+    private final List<Updatable>     cachedUpdatables;
+
+    public Scene() {
+        this.entityMap        = new LinkedHashMap<>();
+        this.cachedUpdatables = new ArrayList<>();
+    }
+
+    public void addEntity(Entity entity) {
+        this.entityMap.put(entity.getId(), entity);
+        for (Component c : entity.getComponents())
+            if (c instanceof Updatable) this.cachedUpdatables.add((Updatable) c);
+    }
+
+    public void removeEntity(String id) {
+        Entity e = this.entityMap.remove(id);
+        if (e != null)
+            for (Component c : e.getComponents())
+                if (c instanceof Updatable) this.cachedUpdatables.remove((Updatable) c);
+    }
+
+    public void clearScene() {
+        this.entityMap.clear();
+        this.cachedUpdatables.clear();
+    }
+
+    public Iterable<Entity> getEntities()      { return this.entityMap.values(); }
+    public List<Updatable>  getUpdatables()    { return this.cachedUpdatables; }
+}
+
+
+--- FILE: src/model/scene/SceneData.java ---
+package model.scene;
+
+import model.entity.Entity;
+import java.util.List;
+
+/**
+ * Classe astratta che rappresenta la "ricetta" di una scena.
+ * Le sottoclassi implementano buildEntities() configurando le entità specifiche.
+ */
+public abstract class SceneData {
+
+    private final String sceneId;
+
+    public SceneData(String sceneId) { this.sceneId = sceneId; }
+    public String getSceneId()       { return this.sceneId; }
+
+    public abstract List<Entity> buildEntities();
+}
+
+
+--- FILE: src/model/scene/data/PrologueSceneData.java ---
+package model.scene.data;
+
+import model.component.data.render.RenderLayer;
+import model.entity.Entity;
+import model.event.EventType;
+import model.factory.ProcessFactory;
+import model.factory.UIFactory;
+import model.scene.SceneData;
+import java.util.*;
+
+/**
+ * Configurazione della scena del Prologo Cinematografico.
+ * Contiene: immagine di copertina, spinner rotante, timer da 3 secondi.
+ */
+public class PrologueSceneData extends SceneData {
+
+    public PrologueSceneData() { super("PROLOGO"); }
+
+    @Override
+    public List<Entity> buildEntities() {
+        List<Entity> objects = new ArrayList<>();
+
+        // 1. Copertina (visiva)
+        objects.add(UIFactory.createAdaptiveImage(
+            "ENTITY_PROLOGO_COVER",
+            "res/copertinaVideogioco.jpg",
+            800, 600,
+            RenderLayer.BACKGROUND
+        ));
+
+        // 2. Spinner rotante (visiva + logica)
+        objects.add(UIFactory.createLoadingSpinner(
+            "ENTITY_SPINNER",
+            "res/spinner/spinner0001.png",
+            750, 550, 2.00,
+            RenderLayer.UI_OVERLAY1
+        ));
+
+        // 3. Timer invisibile (processo): dopo 3 s spedisce PROLOGUE_END
+        objects.add(ProcessFactory.createSceneDirector(
+            "ENTITY_PROLOGUE_TIMER",
+            3000,
+            EventType.PROLOGUE_END
+        ));
+
+        return objects;
+    }
+}
+
+
+--- FILE: src/model/event/EventType.java ---
+package model.event;
+
+/**
+ * Etichette semantiche dei messaggi di evento (type-safe, niente stringhe magiche).
+ */
+public enum EventType {
+    ROOM_EXIT_REACHED,
+    TERMINAL_ACTIVATED,
+    PLAYER_DEATH,
+    PAUSE_REQUESTED,
+    GAME_OVER_ACKNOWLEDGED,
+    STATE_SEQUENCE_COMPLETED,
+    PROLOGUE_END
+}
+
+
+--- FILE: src/model/event/EventMessage.java ---
+package model.event;
+
+/**
+ * Payload dell'Event Bus: etichetta dell'evento + riferimento al mittente.
+ */
+public class EventMessage {
+
+    private final EventType type;
+    private final Object    source;
+
+    public EventMessage(EventType type, Object source) {
+        this.type   = type;
+        this.source = source;
+    }
+
+    public EventType getType()   { return this.type; }
+    public Object    getSource() { return this.source; }
+}
+
+
+--- FILE: src/model/event/EventManager.java ---
+package model.event;
+
+import java.util.LinkedList;
+import java.util.Observable;
+import java.util.Queue;
+
+/**
+ * Singleton Observable — Event Bus globale.
+ * Accoda EventMessage con enqueue() e li processa con processPendingEvents()
+ * (chiamato dal Flow ogni frame), notificando in broadcast tutti gli Observer.
+ */
+@SuppressWarnings("deprecation")
+public class EventManager extends Observable {
+
+    private static EventManager instance;
+    private final Queue<EventMessage> eventQueue;
+
+    private EventManager() { this.eventQueue = new LinkedList<>(); }
+
+    public static EventManager getInstance() {
+        if (instance == null) instance = new EventManager();
+        return instance;
+    }
+
+    public void enqueue(EventMessage message) {
+        this.eventQueue.offer(message);
+    }
+
+    public void processPendingEvents() {
+        while (!this.eventQueue.isEmpty()) {
+            EventMessage msg = this.eventQueue.poll();
+            super.setChanged();
+            super.notifyObservers(msg);
+        }
+    }
+}
+
+
+--- FILE: src/model/phase/Phase.java ---
+package model.phase;
+
+/**
+ * Contratto per le macro-fasi (Menu, Gameplay…).
+ * Non possiede update() — agisce solo come interruttore onEnter/onExit.
+ */
+public interface Phase {
+    void onEnter();
+    void onExit();
+}
+
+
+--- FILE: src/model/phase/State.java ---
+package model.phase;
+
+/**
+ * Contratto per i micro-stati (CinematicPrologueState, MainMenuState…).
+ * Carica la Scene nell'Engine all'onEnter e la rimuove all'onExit.
+ */
+public interface State {
+    void onEnter();
+    void onExit();
+}
+
+
+--- FILE: src/model/phase/GameStatus.java ---
+package model.phase;
+
+/**
+ * Identificatori globali degli stati dell'applicazione.
+ */
+public enum GameStatus {
+    LOADING, CINEMATIC_PROLOGUE, MENU,
+    ELEVATOR_ROOM, CODE, EDITOR, TERMINAL,
+    DUNGEON_ROOM, MONITOR_ROOM,
+    CINEMATIC_TRANSITION, DEATH, CINEMATIC_ENTER_LAB,
+    HALL_OF_FAME, PAUSE
+}
+
+
+--- FILE: src/model/phase/PhaseManager.java ---
+package model.phase;
+
+import model.service.Engine;
+import model.service.SceneLoader;
+import view.component.Panel;
+
+/**
+ * Gestore gerarchico delle macro-fasi e Service Locator per i servizi core.
+ */
+public class PhaseManager {
+
+    private Phase currentPhase;
+    private GameStatus currentStatus;
+    private final Engine      engine;
+    private final Panel       panel;
+    private final SceneLoader sceneLoader;
+
+    public PhaseManager(Engine engine, Panel panel, SceneLoader sceneLoader) {
+        this.engine       = engine;
+        this.panel        = panel;
+        this.sceneLoader  = sceneLoader;
+        this.currentPhase  = null;
+        this.currentStatus = GameStatus.LOADING;
+    }
+
+    public void changePhase(Phase newPhase) {
+        if (this.currentPhase != null) this.currentPhase.onExit();
+        this.currentPhase = newPhase;
+        if (this.currentPhase != null) this.currentPhase.onEnter();
+    }
+
+    public void setStatus(GameStatus status) {
+        this.currentStatus = status;
+        System.out.println("[PhaseManager] Status globale: " + status);
+    }
+
+    public Engine      getEngine()        { return this.engine; }
+    public Panel       getPanel()         { return this.panel; }
+    public SceneLoader getSceneLoader()   { return this.sceneLoader; }
+    public GameStatus  getCurrentStatus() { return this.currentStatus; }
+}
+
+
+--- FILE: src/model/phase/StateManager.java ---
+package model.phase;
+
+import model.service.Engine;
+import model.service.SceneLoader;
+
+/**
+ * Gestore dei micro-stati locali all'interno di una singola Fase.
+ */
+public class StateManager {
+
+    private State currentState;
+    private final SceneLoader sceneLoader;
+    private final Engine      engine;
+
+    public StateManager(SceneLoader sceneLoader, Engine engine) {
+        this.sceneLoader  = sceneLoader;
+        this.engine       = engine;
+        this.currentState = null;
+    }
+
+    public void changeState(State newState) {
+        if (this.currentState != null) this.currentState.onExit();
+        this.currentState = newState;
+        if (this.currentState != null) this.currentState.onEnter();
+    }
+
+    public SceneLoader getSceneLoader() { return this.sceneLoader; }
+    public Engine      getEngine()      { return this.engine; }
+}
+
+
+--- FILE: src/model/phase/menu/MenuPhase.java ---
+package model.phase.menu;
+
+import model.event.EventManager;
+import model.event.EventMessage;
+import model.event.EventType;
+import model.phase.*;
+import model.phase.menu.state.CinematicPrologueState;
+import model.phase.menu.state.MainMenuState;
+import java.util.Observable;
+import java.util.Observer;
+
+/**
+ * Macro-fase dedicata alla navigazione dei menu.
+ * Al primo avvio instrada verso CinematicPrologueState,
+ * ai ritorni successivi verso MainMenuState.
+ * Si registra all'EventManager come Observer per intercettare PROLOGUE_END.
+ */
+@SuppressWarnings("deprecation")
+public class MenuPhase implements Phase, Observer {
+
+    private final PhaseManager phaseManager;
+    private final StateManager stateManager;
+    private boolean isFirstLaunch = true;
+
+    public MenuPhase(PhaseManager phaseManager) {
+        this.phaseManager = phaseManager;
+        this.stateManager = new StateManager(phaseManager.getSceneLoader(), phaseManager.getEngine());
+    }
+
+    @Override
+    public void onEnter() {
+        System.out.println("[System] Transizione a MenuPhase.");
+        EventManager.getInstance().addObserver(this);
+
+        if (this.isFirstLaunch) {
+            this.phaseManager.setStatus(GameStatus.CINEMATIC_PROLOGUE);
+            this.stateManager.changeState(new CinematicPrologueState(this.stateManager));
+            this.isFirstLaunch = false;
+        } else {
+            this.phaseManager.setStatus(GameStatus.MENU);
+            this.stateManager.changeState(new MainMenuState(this.stateManager));
+        }
+    }
+
+    @Override
+    public void update(Observable o, Object arg) {
+        if (arg instanceof EventMessage) {
+            EventMessage msg = (EventMessage) arg;
+            if (msg.getType() == EventType.PROLOGUE_END
+                    && this.phaseManager.getCurrentStatus() == GameStatus.CINEMATIC_PROLOGUE) {
+                System.out.println("[MenuPhase] PROLOGUE_END ricevuto. Transizione a MainMenu...");
+                this.stateManager.changeState(new MainMenuState(this.stateManager));
+                this.phaseManager.setStatus(GameStatus.MENU);
+            }
+        }
+    }
+
+    @Override
+    public void onExit() {
+        this.stateManager.changeState(null);
+        EventManager.getInstance().deleteObserver(this);
+        System.out.println("[System] Uscita da MenuPhase completata.");
+    }
+}
+
+
+--- FILE: src/model/phase/menu/state/CinematicPrologueState.java ---
+package model.phase.menu.state;
+
+import model.phase.State;
+import model.phase.StateManager;
+import model.scene.Scene;
+import model.scene.data.PrologueSceneData;
+
+/**
+ * Micro-stato del prologo cinematografico.
+ * Carica PrologueSceneData, costruisce la Scene e la inietta nell'Engine.
+ */
+public class CinematicPrologueState implements State {
+
+    private final StateManager stateManager;
+    private Scene currentScene;
+
+    public CinematicPrologueState(StateManager stateManager) {
+        this.stateManager = stateManager;
+        this.currentScene = null;
+    }
+
+    @Override
+    public void onEnter() {
+        System.out.println("[State] Caricamento Cinematic Prologue...");
+        this.currentScene = this.stateManager.getSceneLoader().loadScene(new PrologueSceneData());
+        this.stateManager.getEngine().setActiveScene(this.currentScene);
+    }
+
+    @Override
+    public void onExit() {
+        System.out.println("[State] Uscita da Cinematic Prologue.");
+        this.stateManager.getEngine().setActiveScene(null);
+        if (this.currentScene != null) this.currentScene.clearScene();
+    }
+}
+
+
+--- FILE: src/model/phase/menu/state/MainMenuState.java ---
+package model.phase.menu.state;
+
+import model.phase.State;
+import model.phase.StateManager;
+
+/**
+ * Micro-stato del Menu Principale.
+ * Carica la scena del menu e la inietta nell'Engine.
+ * (Implementazione della SceneData del menu in sviluppo.)
+ */
+public class MainMenuState implements State {
+
+    private final StateManager stateManager;
+
+    public MainMenuState(StateManager stateManager) {
+        this.stateManager = stateManager;
+    }
+
+    @Override
+    public void onEnter() {
+        System.out.println("[MainMenuState] Ingresso nel Menu Principale.");
+        // TODO: Scene menuScene = stateManager.getSceneLoader().loadScene(new MainMenuSceneData());
+        //       stateManager.getEngine().setActiveScene(menuScene);
+    }
+
+    @Override
+    public void onExit() {
+        System.out.println("[MainMenuState] Uscita dal Menu Principale.");
+        // TODO: stateManager.getEngine().setActiveScene(null);
+    }
+}
+
+
+--- FILE: src/model/phase/gameplay/GameplayPhase.java ---
+package model.phase.gameplay;
+
+import model.phase.Phase;
+import java.util.Observable;
+import java.util.Observer;
+
+/**
+ * Macro-fase di gioco attivo (Gameplay). — Stub strutturale.
+ * In futuro gestirà micro-stati delle stanze e ascolterà eventi in-game.
+ */
+@SuppressWarnings("deprecation")
+public class GameplayPhase implements Phase, Observer {
+
+    public GameplayPhase() { }
+
+    @Override
+    public void onEnter() {
+        System.out.println("[System] Transizione a GameplayPhase (in sviluppo).");
+        // TODO: EventManager.getInstance().addObserver(this);
+    }
+
+    @Override
+    public void onExit() {
+        System.out.println("[System] Uscita da GameplayPhase.");
+        // TODO: EventManager.getInstance().deleteObserver(this);
+    }
+
+    @Override
+    public void update(Observable o, Object arg) {
+        // TODO: smistamento eventi di gioco (PLAYER_DEATH, ROOM_EXIT_REACHED…)
+    }
+}
+
+
+--- FILE: src/model/factory/UIFactory.java ---
+package model.factory;
+
+import model.component.data.ImageReferenceComponent;
+import model.component.data.render.RenderLayer;
+import model.component.data.render.RenderLayerComponent;
+import model.component.logic.behavior.ui.SpinnerBehavior;
+import model.component.spatial.Transform;
+import model.component.visual.media.sprite.SpriteComponent;
+import model.entity.Entity;
+import view.service.ImageManager;
+import java.awt.image.BufferedImage;
+
+/**
+ * Fabbrica per entità destinate all'Interfaccia Utente (UI).
+ */
+public class UIFactory {
+
+    private UIFactory() { }
+
+    /**
+     * Entità immagine scalata con effetto "cover" (riempie l'intera area target).
+     */
+    public static Entity createAdaptiveImage(String entityId, String imagePath,
+                                              int targetWidth, int targetHeight,
+                                              RenderLayer layer) {
+        BufferedImage image = ImageManager.getInstance().getImage(imagePath);
+        double finalScale   = 1.0;
+        if (image != null) {
+            double scaleX = (double) targetWidth  / image.getWidth();
+            double scaleY = (double) targetHeight / image.getHeight();
+            finalScale    = Math.max(scaleX, scaleY);
+        }
+
+        Entity entity    = new Entity(entityId);
+        ImageReferenceComponent imageRef = new ImageReferenceComponent(imagePath);
+        entity.addComponent(new Transform(0, 0, 0, finalScale));
+        entity.addComponent(imageRef);
+        entity.addComponent(new SpriteComponent(imageRef));
+        entity.addComponent(new RenderLayerComponent(layer));
+        return entity;
+    }
+
+    /**
+     * Entità spinner rotante (visiva + SpinnerBehavior a 240°/s).
+     */
+    public static Entity createLoadingSpinner(String entityId, String imagePath,
+                                               double x, double y, double scale,
+                                               RenderLayer layer) {
+        Transform transform      = new Transform(x, y, 0, scale);
+        Entity spinner           = new Entity(entityId);
+        ImageReferenceComponent imageRef = new ImageReferenceComponent(imagePath);
+        spinner.addComponent(transform);
+        spinner.addComponent(imageRef);
+        spinner.addComponent(new SpriteComponent(imageRef));
+        spinner.addComponent(new RenderLayerComponent(layer));
+        spinner.addComponent(new SpinnerBehavior(transform, 240.0));
+        return spinner;
+    }
+}
+
+
+--- FILE: src/model/factory/ProcessFactory.java ---
+package model.factory;
+
+import model.component.logic.behavior.process.TimerEventBehavior;
+import model.entity.Entity;
+import model.event.EventType;
+
+/**
+ * Fabbrica per entità logiche invisibili (senza componenti di rendering).
+ */
+public class ProcessFactory {
+
+    private ProcessFactory() { }
+
+    /**
+     * Crea un timer invisibile che spedisce un evento allo scadere di durationMs millisecondi.
+     */
+    public static Entity createSceneDirector(String entityId, long durationMs, EventType eventType) {
+        Entity director = new Entity(entityId);
+        director.addComponent(new TimerEventBehavior(director, durationMs, eventType));
+        return director;
+    }
+}
+
+
+--- FILE: src/model/service/Engine.java ---
+package model.service;
+
+import model.component.logic.Updatable;
+import model.scene.Scene;
+import java.util.List;
+
+/**
+ * Motore logico ECS.
+ * Mantiene la Scene attiva e chiama update() su tutti i cachedUpdatables ad ogni tick.
+ */
+public class Engine {
+
+    private Scene activeScene;
+
+    public Engine() { this.activeScene = null; }
+
+    public void  setActiveScene(Scene s) { this.activeScene = s; }
+    public Scene getActiveScene()        { return this.activeScene; }
+
+    public void update() {
+        if (this.activeScene != null) {
+            List<Updatable> updatables = this.activeScene.getUpdatables();
+            if (updatables != null)
+                for (Updatable u : updatables) u.update();
+            // TODO: CollisionSystem, PhysicsSystem, GarbageCollectorSystem
+        }
+    }
+}
+
+
+--- FILE: src/model/service/SceneLoader.java ---
+package model.service;
+
+import model.component.data.ImageReferenceComponent;
+import model.entity.Entity;
+import model.scene.Scene;
+import model.scene.SceneData;
+import view.service.ImageManager;
+import java.util.List;
+
+/**
+ * Traduce SceneData (dati statici) in una Scene viva.
+ * Ispeziona ogni Entity alla ricerca di ImageReferenceComponent
+ * e carica automaticamente le texture nell'ImageManager.
+ */
+public class SceneLoader {
+
+    private final ImageManager imageManager;
+
+    public SceneLoader() { this.imageManager = ImageManager.getInstance(); }
+
+    public Scene loadScene(SceneData data) {
+        System.out.println("[SceneLoader] Caricamento scena: " + data.getSceneId());
+        Scene scene            = new Scene();
+        List<Entity> entities  = data.buildEntities();
+
+        if (entities != null) {
+            for (Entity entity : entities) {
+                ImageReferenceComponent imageRef = entity.getComponent(ImageReferenceComponent.class);
+                if (imageRef != null) this.imageManager.load(imageRef.getImageId());
+                scene.addEntity(entity);
+            }
+        }
+
+        System.out.println("[SceneLoader] Scena " + data.getSceneId() + " caricata.");
+        return scene;
+    }
+}
+
+
+--- FILE: src/model/service/TimeManager.java ---
+package model.service;
+
+/**
+ * Singleton temporale. Il Flow vi scrive deltaTime e FPS ad ogni tick;
+ * tutti i Behavior lo leggono per calcoli frame-rate independent.
+ */
+public class TimeManager {
+
+    private static TimeManager instance;
+    private double deltaTime;
+    private int    currentFPS;
+
+    private TimeManager() { this.deltaTime = 0.0; this.currentFPS = 0; }
+
+    public static TimeManager getInstance() {
+        if (instance == null) instance = new TimeManager();
+        return instance;
+    }
+
+    public void updateTimeData(double deltaTime, int currentFPS) {
+        this.deltaTime  = deltaTime;
+        this.currentFPS = currentFPS;
+    }
+
+    public double getDeltaTime()  { return this.deltaTime; }
+    public int    getCurrentFPS() { return this.currentFPS; }
+}
+
+
+--- FILE: src/model/data/Config.java ---
+package model.data;
+
+/**
+ * Costanti globali di configurazione del motore.
+ */
+public class Config {
+    public static final int  TARGET_FPS     = 60;
+    public static final long TARGET_TIME_NS = 1_000_000_000L / TARGET_FPS;
+    public static final int  WINDOW_WIDTH   = 800;
+    public static final int  WINDOW_HEIGHT  = 600;
+    public static final int  TILE_SIZE      = 64;
+    private Config() { }
+}
+
+
+--- FILE: src/model/data/TransformUtils.java ---
+package model.data;
+
+/**
+ * Libreria di calcoli statici per le trasformazioni spaziali.
+ */
+public class TransformUtils {
+
+    private TransformUtils() { }
+
+    /**
+     * Calcola il fattore di scala "cover": l'immagine riempie l'area target
+     * mantenendo le proporzioni (eventuale clipping ai bordi).
+     */
+    public static double calculateCoverScale(int sourceWidth, int sourceHeight,
+                                              int targetWidth, int targetHeight) {
+        double scaleX = (double) targetWidth  / sourceWidth;
+        double scaleY = (double) targetHeight / sourceHeight;
+        return Math.max(scaleX, scaleY);
+    }
+}
+
+
+--- FILE: src/model/data/GameProfile.java ---
+package model.data;
+
+public class GameProfile {
+    // TODO: profilo del giocatore (nome, statistiche, progressi)
+}
+
+
+--- FILE: src/model/data/HallOfFame.java ---
+package model.data;
+
+public class HallOfFame {
+    // TODO: classifica dei punteggi massimi
+}
+
+
+--- FILE: src/model/data/RunData.java ---
+package model.data;
+
+public class RunData {
+    // TODO: dati della partita in corso (vite, tempo, oggetti raccolti)
+}
+
+
+--- FILE: src/view/component/Frame.java ---
+package view.component;
+
+import javax.swing.*;
+
+/**
+ * JFrame del sistema operativo.
+ * Contiene il Panel, si adatta alle sue dimensioni e centra la finestra.
+ */
+public class Frame extends JFrame {
+
+    public Frame(Panel panel) {
+        this.setTitle("Impossible Mission Remake");
+        this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        this.setResizable(false);
+        this.add(panel);
+        this.pack();
+        this.setLocationRelativeTo(null);
+        this.setVisible(true);
+    }
+}
+
+
+--- FILE: src/view/component/Panel.java ---
+package view.component;
+
+import model.entity.Entity;
+import view.service.RenderSystem;
+import javax.swing.*;
+import java.awt.*;
+
+/**
+ * Superficie Swing con double buffering.
+ * Riceve le Entity dal Flow tramite setEntities() e le passa al RenderSystem
+ * in paintComponent().
+ */
+public class Panel extends JPanel {
+
+    private final RenderSystem      renderSystem;
+    private       Iterable<Entity>  currentEntities;
+
+    public Panel(int width, int height) {
+        this.renderSystem    = new RenderSystem();
+        this.currentEntities = null;
+        this.setPreferredSize(new Dimension(width, height));
+        this.setDoubleBuffered(true);
+        this.setBackground(Color.BLACK);
+        this.setFocusable(true);
+    }
+
+    public void setEntities(Iterable<Entity> entities) {
+        this.currentEntities = entities;
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        Graphics2D g2d = (Graphics2D) g;
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        if (this.currentEntities != null)
+            this.renderSystem.render(g2d, this.currentEntities, 0.0, 0.0);
+        g2d.dispose();
+    }
+}
+
+
+--- FILE: src/view/component/SpriteRenderer.java ---
+package view.component;
+
+import model.component.spatial.Transform;
+import model.component.visual.media.sprite.SpriteComponent;
+import model.entity.Entity;
+import view.service.ImageManager;
+import java.awt.*;
+import java.awt.geom.AffineTransform;
+import java.awt.image.BufferedImage;
+
+/**
+ * Utility stateless per il rendering di una singola Entity ECS.
+ * Legge Transform e SpriteComponent e disegna su Graphics2D
+ * applicando scala, rotazione e opacità.
+ */
+public class SpriteRenderer {
+
+    public static void render(Entity entity, Graphics2D g2d) {
+        SpriteComponent spriteData = entity.getComponent(SpriteComponent.class);
+        Transform transform        = entity.getComponent(Transform.class);
+
+        if (spriteData == null || transform == null || !spriteData.isVisible()) return;
+
+        BufferedImage image = ImageManager.getInstance().getImage(
+            spriteData.getImageReference().getImageId()
+        );
+        if (image == null) return;
+
+        AffineTransform oldTransform = g2d.getTransform();
+        Composite       oldComposite = g2d.getComposite();
+
+        int    x        = (int) transform.getX();
+        int    y        = (int) transform.getY();
+        double rotation = transform.getRotation();
+        double scale    = transform.getScale();
+        float  opacity  = spriteData.getOpacity();
+
+        if (opacity < 1.0f)
+            g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, opacity));
+
+        int drawWidth  = (int) (image.getWidth()  * scale);
+        int drawHeight = (int) (image.getHeight() * scale);
+
+        if (rotation != 0.0)
+            g2d.rotate(Math.toRadians(rotation), x + drawWidth / 2.0, y + drawHeight / 2.0);
+
+        g2d.drawImage(image, x, y, drawWidth, drawHeight, null);
+
+        g2d.setTransform(oldTransform);
+        g2d.setComposite(oldComposite);
+    }
+}
+
+
+--- FILE: src/view/service/ImageManager.java ---
+package view.service;
+
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Singleton cache delle immagini.
+ * Carica ogni file da disco una sola volta e lo serve dalla RAM.
+ */
+public class ImageManager {
+
+    private static ImageManager instance;
+    private final Map<String, BufferedImage> images;
+
+    private ImageManager() { this.images = new HashMap<>(); }
+
+    public static ImageManager getInstance() {
+        if (instance == null) instance = new ImageManager();
+        return instance;
+    }
+
+    public void load(String path) {
+        if (this.images.containsKey(path)) return;
+        try {
+            this.images.put(path, ImageIO.read(new File(path)));
+        } catch (IOException e) {
+            System.err.println("[ImageManager] Errore caricamento: " + path);
+        }
+    }
+
+    public BufferedImage getImage(String path)    { return this.images.get(path); }
+
+    public BufferedImage getSubImage(String path, int x, int y, int width, int height) {
+        BufferedImage sheet = this.images.get(path);
+        return (sheet != null) ? sheet.getSubimage(x, y, width, height) : null;
+    }
+
+    public void clear() { this.images.clear(); }
+}
+
+
+--- FILE: src/view/service/RenderSystem.java ---
+package view.service;
+
+import model.component.data.render.RenderLayerComponent;
+import model.component.visual.media.sprite.SpriteComponent;
+import model.entity.Entity;
+import view.component.SpriteRenderer;
+import java.awt.*;
+import java.awt.geom.AffineTransform;
+import java.util.*;
+import java.util.List;
+
+/**
+ * Sistema ECS di rendering.
+ * Filtra le entità visibili, le ordina per RenderLayer (algoritmo del pittore),
+ * applica l'offset telecamera per gli elementi di mondo e delega il disegno
+ * a SpriteRenderer.
+ */
+public class RenderSystem {
+
+    private final Comparator<Entity> layerComparator;
+
+    public RenderSystem() {
+        this.layerComparator = Comparator.comparingInt(e ->
+            e.getComponent(RenderLayerComponent.class).getLayer().ordinal()
+        );
+    }
+
+    public void render(Graphics2D g2d, Iterable<Entity> entities,
+                       double cameraX, double cameraY) {
+        List<Entity> renderables = new ArrayList<>();
+
+        // 1. Filtraggio
+        for (Entity e : entities) {
+            SpriteComponent       sprite = e.getComponent(SpriteComponent.class);
+            RenderLayerComponent  layer  = e.getComponent(RenderLayerComponent.class);
+            if (sprite != null && layer != null && sprite.isVisible())
+                renderables.add(e);
+        }
+
+        // 2. Ordinamento Z-Index
+        renderables.sort(this.layerComparator);
+
+        // 3. Ciclo di disegno
+        for (Entity element : renderables) {
+            AffineTransform saved  = g2d.getTransform();
+            boolean isUI           = element.getComponent(RenderLayerComponent.class)
+                                            .getLayer().name().startsWith("UI");
+            if (!isUI) g2d.translate(-cameraX, -cameraY);
+            SpriteRenderer.render(element, g2d);
+            g2d.setTransform(saved);
+        }
+    }
+}
+
+
+--- FILE: src/view/service/SoundPlayer.java ---
+package view.service;
+
+public class SoundPlayer {
+    // TODO: riproduzione audio ed effetti sonori
+}

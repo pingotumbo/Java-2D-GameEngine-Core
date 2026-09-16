@@ -1,0 +1,222 @@
+<svg width="680" viewBox="0 0 680 1780" xmlns="http://www.w3.org/2000/svg" style="background:#ffffff; font-family: Arial, sans-serif;">
+  <title>Pseudocodice del motore ECS — ImpossibleMission</title>
+  <desc>Diagramma strutturale dell'architettura ECS del progetto, dalla App all'Engine, View, Events e State Machine.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <!-- ENTRY POINT -->
+  <rect x="240" y="20" width="200" height="44" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#3C3489" x="340" y="42" text-anchor="middle" dominant-baseline="central">App.main()</text>
+  <text font-size="12" fill="#888780" x="340" y="74" text-anchor="middle">istanzia e collega tutti i moduli</text>
+  <line x1="340" y1="64" x2="340" y2="86" stroke="#888780" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- SETUP box -->
+  <rect x="30" y="90" width="620" height="180" rx="12" fill="none" stroke="#B4B2A9" stroke-width="1" stroke-dasharray="6 4"/>
+  <text font-size="12" fill="#888780" x="46" y="110">setup (DI manuale)</text>
+
+  <rect x="50" y="120" width="160" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#085041" x="130" y="138" text-anchor="middle" dominant-baseline="central">Engine</text>
+  <text font-size="12" fill="#0F6E56" x="130" y="155" text-anchor="middle" dominant-baseline="central">logica ECS</text>
+
+  <rect x="260" y="120" width="160" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#085041" x="340" y="138" text-anchor="middle" dominant-baseline="central">SceneLoader</text>
+  <text font-size="12" fill="#0F6E56" x="340" y="155" text-anchor="middle" dominant-baseline="central">build + carica risorse</text>
+
+  <rect x="470" y="120" width="160" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#085041" x="550" y="138" text-anchor="middle" dominant-baseline="central">Panel / Frame</text>
+  <text font-size="12" fill="#0F6E56" x="550" y="155" text-anchor="middle" dominant-baseline="central">Swing, double buffer</text>
+
+  <rect x="160" y="196" width="360" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#3C3489" x="340" y="216" text-anchor="middle" dominant-baseline="central">PhaseManager</text>
+  <text font-size="12" fill="#534AB7" x="340" y="234" text-anchor="middle" dominant-baseline="central">service locator: Engine, Panel, SceneLoader</text>
+
+  <line x1="130" y1="164" x2="230" y2="196" stroke="#888780" stroke-width="1" marker-end="url(#arrow)"/>
+  <line x1="340" y1="164" x2="340" y2="196" stroke="#888780" stroke-width="1" marker-end="url(#arrow)"/>
+  <line x1="550" y1="164" x2="450" y2="196" stroke="#888780" stroke-width="1" marker-end="url(#arrow)"/>
+
+  <!-- FLOW -->
+  <line x1="340" y1="252" x2="340" y2="290" stroke="#888780" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="180" y="290" width="320" height="56" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#633806" x="340" y="310" text-anchor="middle" dominant-baseline="central">Flow  (Thread @60 FPS)</text>
+  <text font-size="12" fill="#854F0B" x="340" y="328" text-anchor="middle" dominant-baseline="central">loop: update → events → render → sleep</text>
+
+  <!-- GAME LOOP DETAIL -->
+  <rect x="30" y="370" width="620" height="280" rx="12" fill="none" stroke="#B4B2A9" stroke-width="1" stroke-dasharray="6 4"/>
+  <text font-size="12" fill="#888780" x="46" y="390">ogni frame</text>
+  <line x1="340" y1="346" x2="340" y2="372" stroke="#888780" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <text font-size="12" fill="#888780" x="140" y="388" text-anchor="middle">1.</text>
+  <rect x="50" y="398" width="180" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#2C2C2A" x="140" y="416" text-anchor="middle" dominant-baseline="central">TimeManager</text>
+  <text font-size="12" fill="#5F5E5A" x="140" y="433" text-anchor="middle" dominant-baseline="central">deltaTime, FPS</text>
+
+  <text font-size="12" fill="#888780" x="340" y="388" text-anchor="middle">2.</text>
+  <rect x="250" y="398" width="180" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#085041" x="340" y="416" text-anchor="middle" dominant-baseline="central">Engine.update()</text>
+  <text font-size="12" fill="#0F6E56" x="340" y="433" text-anchor="middle" dominant-baseline="central">itera Updatable[]</text>
+
+  <text font-size="12" fill="#888780" x="540" y="388" text-anchor="middle">3.</text>
+  <rect x="450" y="398" width="180" height="44" rx="8" fill="#FAECE7" stroke="#993C1D" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#712B13" x="540" y="416" text-anchor="middle" dominant-baseline="central">EventManager</text>
+  <text font-size="12" fill="#993C1D" x="540" y="433" text-anchor="middle" dominant-baseline="central">processa coda eventi</text>
+
+  <line x1="230" y1="420" x2="250" y2="420" stroke="#888780" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="430" y1="420" x2="450" y2="420" stroke="#888780" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <line x1="340" y1="442" x2="340" y2="478" stroke="#888780" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text font-size="12" fill="#888780" x="340" y="468" text-anchor="middle">4.</text>
+  <rect x="170" y="478" width="340" height="44" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#633806" x="340" y="496" text-anchor="middle" dominant-baseline="central">Il Ponte  (Model → View)</text>
+  <text font-size="12" fill="#854F0B" x="340" y="513" text-anchor="middle" dominant-baseline="central">Panel.setEntities( scene.getEntities() )</text>
+
+  <line x1="340" y1="522" x2="340" y2="558" stroke="#888780" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text font-size="12" fill="#888780" x="340" y="548" text-anchor="middle">5.</text>
+  <rect x="170" y="558" width="340" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#085041" x="340" y="577" text-anchor="middle" dominant-baseline="central">Panel.repaint() → RenderSystem</text>
+  <text font-size="12" fill="#0F6E56" x="340" y="595" text-anchor="middle" dominant-baseline="central">filtra → ordina Z-Index → SpriteRenderer</text>
+
+  <!-- ECS SECTION -->
+  <line x1="340" y1="614" x2="340" y2="652" stroke="#888780" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="30" y="656" width="620" height="360" rx="12" fill="none" stroke="#B4B2A9" stroke-width="1" stroke-dasharray="6 4"/>
+  <text font-size="12" fill="#888780" x="46" y="676">ECS — Entity Component System</text>
+
+  <rect x="240" y="686" width="200" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#0C447C" x="340" y="704" text-anchor="middle" dominant-baseline="central">Entity</text>
+  <text font-size="12" fill="#185FA5" x="340" y="721" text-anchor="middle" dominant-baseline="central">Map&lt;Class, Component&gt;</text>
+
+  <text font-size="12" fill="#888780" x="340" y="758" text-anchor="middle">componenti (tutti implementano Component)</text>
+  <line x1="340" y1="730" x2="340" y2="766" stroke="#888780" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <rect x="50" y="776" width="130" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#2C2C2A" x="115" y="795" text-anchor="middle" dominant-baseline="central">Transform</text>
+  <text font-size="12" fill="#5F5E5A" x="115" y="813" text-anchor="middle" dominant-baseline="central">x, y, rot, scale</text>
+
+  <rect x="200" y="776" width="130" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#2C2C2A" x="265" y="795" text-anchor="middle" dominant-baseline="central">SpriteComponent</text>
+  <text font-size="12" fill="#5F5E5A" x="265" y="813" text-anchor="middle" dominant-baseline="central">imageRef, opacity…</text>
+
+  <rect x="350" y="776" width="140" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#2C2C2A" x="420" y="795" text-anchor="middle" dominant-baseline="central">RenderLayer</text>
+  <text font-size="12" fill="#5F5E5A" x="420" y="813" text-anchor="middle" dominant-baseline="central">Z-Index enum</text>
+
+  <rect x="510" y="776" width="120" height="56" rx="8" fill="#FAECE7" stroke="#993C1D" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#712B13" x="570" y="795" text-anchor="middle" dominant-baseline="central">Behavior</text>
+  <text font-size="12" fill="#993C1D" x="570" y="813" text-anchor="middle" dominant-baseline="central">Updatable, logica</text>
+
+  <line x1="290" y1="730" x2="115" y2="776" stroke="#B4B2A9" stroke-width="0.5"/>
+  <line x1="320" y1="730" x2="265" y2="776" stroke="#B4B2A9" stroke-width="0.5"/>
+  <line x1="360" y1="730" x2="420" y2="776" stroke="#B4B2A9" stroke-width="0.5"/>
+  <line x1="390" y1="730" x2="570" y2="776" stroke="#B4B2A9" stroke-width="0.5"/>
+
+  <rect x="130" y="868" width="420" height="56" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#0C447C" x="340" y="886" text-anchor="middle" dominant-baseline="central">Scene</text>
+  <text font-size="12" fill="#185FA5" x="340" y="904" text-anchor="middle" dominant-baseline="central">Map&lt;id, Entity&gt; + List&lt;Updatable&gt; (cache)</text>
+
+  <line x1="115" y1="832" x2="220" y2="868" stroke="#B4B2A9" stroke-width="0.5"/>
+  <line x1="265" y1="832" x2="290" y2="868" stroke="#B4B2A9" stroke-width="0.5"/>
+  <line x1="420" y1="832" x2="390" y2="868" stroke="#B4B2A9" stroke-width="0.5"/>
+  <line x1="570" y1="832" x2="460" y2="868" stroke="#B4B2A9" stroke-width="0.5"/>
+
+  <text font-size="12" fill="#888780" x="340" y="956" text-anchor="middle">fabbricate da</text>
+  <line x1="340" y1="924" x2="340" y2="968" stroke="#888780" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <rect x="80" y="968" width="130" height="44" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#3C3489" x="145" y="986" text-anchor="middle" dominant-baseline="central">UIFactory</text>
+  <text font-size="12" fill="#534AB7" x="145" y="1003" text-anchor="middle" dominant-baseline="central">immagini, spinner</text>
+
+  <rect x="255" y="968" width="170" height="44" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#3C3489" x="340" y="986" text-anchor="middle" dominant-baseline="central">ProcessFactory</text>
+  <text font-size="12" fill="#534AB7" x="340" y="1003" text-anchor="middle" dominant-baseline="central">timer invisibili</text>
+
+  <rect x="470" y="968" width="120" height="44" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#3C3489" x="530" y="986" text-anchor="middle" dominant-baseline="central">[future…]</text>
+  <text font-size="12" fill="#534AB7" x="530" y="1003" text-anchor="middle" dominant-baseline="central">EnemyFactory…</text>
+
+  <!-- STATE MACHINE -->
+  <rect x="30" y="1044" width="620" height="300" rx="12" fill="none" stroke="#B4B2A9" stroke-width="1" stroke-dasharray="6 4"/>
+  <text font-size="12" fill="#888780" x="46" y="1064">macchina a stati gerarchica</text>
+  <line x1="340" y1="1012" x2="340" y2="1046" stroke="#888780" stroke-width="1" marker-end="url(#arrow)"/>
+
+  <rect x="220" y="1072" width="240" height="44" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#3C3489" x="340" y="1090" text-anchor="middle" dominant-baseline="central">PhaseManager</text>
+  <text font-size="12" fill="#534AB7" x="340" y="1107" text-anchor="middle" dominant-baseline="central">changePhase( Phase )</text>
+
+  <line x1="340" y1="1116" x2="340" y2="1140" stroke="#888780" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <rect x="80" y="1140" width="180" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#085041" x="170" y="1158" text-anchor="middle" dominant-baseline="central">MenuPhase</text>
+  <text font-size="12" fill="#0F6E56" x="170" y="1175" text-anchor="middle" dominant-baseline="central">Observer EventManager</text>
+
+  <rect x="310" y="1140" width="180" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#085041" x="400" y="1158" text-anchor="middle" dominant-baseline="central">GameplayPhase</text>
+  <text font-size="12" fill="#0F6E56" x="400" y="1175" text-anchor="middle" dominant-baseline="central">stub futuro</text>
+
+  <line x1="300" y1="1116" x2="200" y2="1140" stroke="#888780" stroke-width="1" marker-end="url(#arrow)"/>
+  <line x1="380" y1="1116" x2="380" y2="1140" stroke="#888780" stroke-width="1" marker-end="url(#arrow)"/>
+
+  <line x1="170" y1="1184" x2="170" y2="1216" stroke="#888780" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="80" y="1216" width="180" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#2C2C2A" x="170" y="1234" text-anchor="middle" dominant-baseline="central">StateManager</text>
+  <text font-size="12" fill="#5F5E5A" x="170" y="1251" text-anchor="middle" dominant-baseline="central">changeState( State )</text>
+
+  <line x1="170" y1="1260" x2="110" y2="1292" stroke="#888780" stroke-width="1" marker-end="url(#arrow)"/>
+  <line x1="170" y1="1260" x2="260" y2="1292" stroke="#888780" stroke-width="1" marker-end="url(#arrow)"/>
+
+  <rect x="50" y="1292" width="160" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#2C2C2A" x="130" y="1310" text-anchor="middle" dominant-baseline="central">CinematicPrologue</text>
+  <text font-size="12" fill="#5F5E5A" x="130" y="1327" text-anchor="middle" dominant-baseline="central">carica PrologueScene</text>
+
+  <rect x="230" y="1292" width="140" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#2C2C2A" x="300" y="1310" text-anchor="middle" dominant-baseline="central">MainMenuState</text>
+  <text font-size="12" fill="#5F5E5A" x="300" y="1327" text-anchor="middle" dominant-baseline="central">carica MenuScene</text>
+
+  <!-- EVENT BUS -->
+  <rect x="30" y="1378" width="620" height="200" rx="12" fill="none" stroke="#B4B2A9" stroke-width="1" stroke-dasharray="6 4"/>
+  <text font-size="12" fill="#888780" x="46" y="1398">event bus</text>
+  <line x1="540" y1="1260" x2="540" y2="1390" stroke="#888780" stroke-width="1" marker-end="url(#arrow)"/>
+  <text font-size="12" fill="#888780" x="557" y="1320">eventi</text>
+
+  <rect x="220" y="1406" width="240" height="56" rx="8" fill="#FAECE7" stroke="#993C1D" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#712B13" x="340" y="1424" text-anchor="middle" dominant-baseline="central">EventManager  (Singleton)</text>
+  <text font-size="12" fill="#993C1D" x="340" y="1442" text-anchor="middle" dominant-baseline="central">enqueue() → processPendingEvents()</text>
+
+  <line x1="260" y1="1462" x2="180" y2="1500" stroke="#888780" stroke-width="1" marker-end="url(#arrow)"/>
+  <line x1="420" y1="1462" x2="510" y2="1500" stroke="#888780" stroke-width="1" marker-end="url(#arrow)"/>
+
+  <rect x="60" y="1500" width="230" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#2C2C2A" x="175" y="1518" text-anchor="middle" dominant-baseline="central">EventMessage</text>
+  <text font-size="12" fill="#5F5E5A" x="175" y="1535" text-anchor="middle" dominant-baseline="central">EventType + source</text>
+
+  <rect x="400" y="1500" width="220" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#2C2C2A" x="510" y="1518" text-anchor="middle" dominant-baseline="central">EventType  (enum)</text>
+  <text font-size="12" fill="#5F5E5A" x="510" y="1535" text-anchor="middle" dominant-baseline="central">PROLOGUE_END, PLAYER_DEATH…</text>
+
+  <path d="M620 1434 Q660 1434 660 1200 Q660 1160 490 1160" fill="none" stroke="#B4B2A9" stroke-width="0.5" stroke-dasharray="5 3" marker-end="url(#arrow)"/>
+  <text font-size="12" fill="#888780" x="655" y="1310" text-anchor="middle" transform="rotate(90 655 1310)">notifyObservers</text>
+
+  <!-- VIEW SERVICES -->
+  <rect x="30" y="1596" width="620" height="160" rx="12" fill="none" stroke="#B4B2A9" stroke-width="1" stroke-dasharray="6 4"/>
+  <text font-size="12" fill="#888780" x="46" y="1616">servizi view</text>
+
+  <rect x="60" y="1626" width="160" height="56" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#0C447C" x="140" y="1644" text-anchor="middle" dominant-baseline="central">ImageManager</text>
+  <text font-size="12" fill="#185FA5" x="140" y="1662" text-anchor="middle" dominant-baseline="central">cache BufferedImage</text>
+
+  <rect x="260" y="1626" width="160" height="56" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#0C447C" x="340" y="1644" text-anchor="middle" dominant-baseline="central">RenderSystem</text>
+  <text font-size="12" fill="#185FA5" x="340" y="1662" text-anchor="middle" dominant-baseline="central">filtra, ordina, delega</text>
+
+  <rect x="460" y="1626" width="160" height="56" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text font-size="14" font-weight="500" fill="#0C447C" x="540" y="1644" text-anchor="middle" dominant-baseline="central">SpriteRenderer</text>
+  <text font-size="12" fill="#185FA5" x="540" y="1662" text-anchor="middle" dominant-baseline="central">transform → pixel</text>
+
+  <line x1="220" y1="1654" x2="260" y2="1654" stroke="#888780" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="420" y1="1654" x2="460" y2="1654" stroke="#888780" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Config note -->
+  <rect x="60" y="1710" width="560" height="40" rx="8" fill="none" stroke="#D3D1C7" stroke-width="0.5"/>
+  <text font-size="12" fill="#888780" x="340" y="1735" text-anchor="middle">Config: TARGET_FPS=60, WINDOW=800x600, TILE=64px  —  TransformUtils: calcoli statici di scala</text>
+</svg>

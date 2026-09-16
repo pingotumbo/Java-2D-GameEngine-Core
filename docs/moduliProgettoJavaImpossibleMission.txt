@@ -1,0 +1,409 @@
+Modulo main
+	
+	Si occupa di gestire le operazioni principali, di attivare tutte le componenti base del programma.
+
+
+(se serve, e probabilmente servira') Service GameFlow (dentro model)
+	
+	Contiene le funzioni principali che ogni stato deve eseguire quando inizializzato.
+
+#ELENCO DI TUTTI GLI STATI (dentro model)
+
+Gli stati sono quelle classi che avviano una sequenza di operazioni specifiche dello stato in questione.
+Ne ho messi tanti per includere tutto ma se vediamo dei pattern di funzioni o operazioni simili tra loro allora potremo considerare l'idea di creare
+una classe genitore generica o piu classi genitore generiche anziche.
+
+State LoadingState
+
+	Entra in stato di loading per il caricamento (e forse anche in altri casi).
+
+State CinematicPrologueState
+
+	Avvia tutte le operazioni da eseguire quando si entra nello stato di prologo (intro al gioco se lo faremo, animazioni, suono ecc.)
+
+State MenuState
+
+	Avvia tutte le operazioni logiche quando si entra nello stato menu (ad esempio avvia i comandi menu controll).
+
+State ElevatorRoomState
+
+	Avvia tutte le operazioni logiche per quando si entra in una stanza ascensore e quindi anche a inizio run.
+
+State TransitionState
+
+	Avvia le operazioni per quando si entra nello stato di transazione (ad esempio tra una stanza del dungeon e l'altra).
+
+State CodeState
+
+	Avvia le operazioni per quando si attiva l'interfaccia per la soluzione dei puzzles.
+	
+State EditorState
+
+	Avvia le operazioni per quando si usa l'editor per la creazione delle stanze.
+
+State TerminalState
+
+	Avvia le operazioni per quando si usa un qualsiasi terminale di una normale stanza del dungeon.
+
+State TerminalMonitorRoomState
+
+	Avvia le operazioni per quando si usa il terminale della stanza speciale MonitorRoom.
+
+State DeathState
+
+	Avvia le operazioni per quando muore il giocatore.
+
+State CinematicEnterLaboratoryState
+
+	Avvia le operazioni relative a quando il giocatore entra nel laboratorio e vince la partita.
+
+State EndInterfaceState (o HallOfFameState)
+
+	Avvia le operazione relative a quando si avvia l'interfaccia per il calcolo del punteggio della run e il salvataffio sulla hall of fame.
+
+State PauseState
+
+	Avvia operazioni per quando si mette in pausa il gioco.
+
+
+#ELENCO DI TUTTI I MODULI DATI (dentro model)
+
+Ovvero tutti quei moduli o classi che si occupano di tenere le informazioni di gioco. Ne scriveremo probabilmente altre e dovremo anche cercare di 
+organizzarle meglio o deprecare quelle che non servono.
+
+
+Data RunData
+
+	Contiene tutti i dati della run e lo stato corrente
+
+Data GameConfig
+
+	Contiene i dati di gioco relativi a costanti e regole (punteggio, limiti ecc.)
+
+Data UserData
+
+	Contiene i dati preservanti salvati dell'utente. (cartella del suo computer).
+
+(se serve) Data RoomData
+
+	La generica struttura di una stanza del dungeon
+
+(se serve) Data CodeOfPieces
+
+	Tutti i dati per i pezzi di codice in generale.
+
+(se serve) Data PuzzlesRun
+
+	Tutti i pezzi di codice della run, la memoria degli slot assegnati e delle modifiche ai pezzi di codice usando
+	l'interfaccia Code per modificare e risolvere i puzzles.
+
+
+Data DataHallOfFame
+
+	I dati relativi alla hall of fame, comprese le etichette dei record.
+
+Data EventsData
+
+	Contiene tutti gli eventi e le loro logiche disponibili
+
+#ELENCO EVENTI (dentro model)
+
+Gli eventi devono essere dei triggered zone che si attivano quando il player ci passa sopra o fa qualcosa. Alcuni mi sembrano essenziali tipo: Room exit,
+Robot collision, altri non so se in realta' potremmo farne a meno, tipo: LootStarted, LootCompleted, TerminalTriggered, nel senso che magari sono cambi di
+stato chiamabili direttamente dal controller in questione tipo: controller DungeonRoom, tasto pausa avvia subito il cambio stato a pausa.
+
+Event RoomExitTriggered
+
+Event TerminalTriggered
+
+Event LootStarted (o direttamente loot requested)
+
+Event LootCompleted
+
+Event RobotCollision
+
+Event PauseRequested
+
+
+#ELENCO MODULI LOGICI ARITMETICI E OPERATIVI USATI DAL PROGRAMMA (dentro model)
+
+Tutte le classi che si occupano di fare calcoli, gestire dati e modificarli, fare operazioni logiche, probabilmente ne creeremo molte di piu' ancora.
+
+Interface Updatable
+
+    Il "protocollo" di aggiornamento. È un'interfaccia. Qualsiasi elemento logico del gioco che cambia nel tempo
+    (un angolo che ruota, un robot che cammina) la implementa esponendo il metodo update().
+
+Modulo Logico Componente (es. IconaCaricamento / RobotLogic)
+
+    Classi pure che implementano Updatable. Contengono solo variabili matematiche (gradi di rotazione, coordinate X/Y nel database).
+    Non sanno nulla di pixel o schermi. Possono essere pensate per il posizionamento "Universale" (Screen Space) o "Locale" (World Space).
+
+
+Service	GameEngine (o GameLoop)
+
+	Gestisce il ritmo principale (60 FPS). Coordina aggiornamenti e rendering. Contiene il Timer per sincronizzare i frame.
+	scorre i database (o le liste) dello Stato corrente e chiama il metodo update() di tutti gli elementi Updatable per far evolvere la simulazione.
+
+Service Viewport (La Finestra di Visualizzazione)
+
+    L'occhio matematico. Conosce i confini dell'area attualmente visibile. Separa la logica in "Universale" (UI fissa sulla finestra)
+    e "Locale/Relativo" (mappa virtuale). Esegue il Culling: filtra il database e scarta gli elementi che si trovano
+    fisicamente fuori dai confini della finestra, passando alla View solo ciò che va materialmente disegnato.
+
+Service PhysicsEngine (o SimulationEngine, forse deprecato)
+
+	Ogni frame: aggiorna posizioni di player e robot.
+	Gestisce i contatori interni ("robot A si muove ogni 2 frame").
+	Effettua i calcoli di collisione.
+	Genera gli eventi in base alla collisione.
+	Modifica gli stati in base alle collisioni (morte, cambio stanza, ecc.).
+
+Service GameRenderer(da deprecare probabilmente)
+
+	itera la matrice, traduce coordinate griglia di pixel, disegna.
+
+Service CollisionHandler
+
+	Controlla se due entita' occupano la stessa cella.
+	Determina il tipo di collisione (robot vs player, player vs parete, ecc.).
+	Ritorna info sulla collisione al PhysicsEngine.
+
+Service RoomDispenser (o RoomHandler o RoomDealer o altro)
+
+	Si occupa di gestire la distribuzione delle stanze a inizio run creando l'effetto procedurale.
+
+Service ValuesShuffler (o qualsiasi altro nome)
+
+	Gestisce lo smistamento e l'assegnazione dei valori randomici per mobili, sequenze monitor room e altro.
+
+Service RobotBehaviourAssigner (o altro nome)
+
+	Crea un carattere casuale da assegnare a un robot.
+
+Service SequenceGenerator
+
+	Crea la sequenza di n caselle per il minigioco del monitor Room.
+
+
+
+#ELENCO MODULI PER LA VISUALIZZAZIONE (dentro view)
+
+Sono quelle classi specializzate per la view e quindi per visualizzare le textures e i suoni, nel caso ci venga in mente altro affine lo aggiungiamo qui.
+
+Service GamePanel
+
+    Eredita da JPanel. È la superficie di rendering vera e propria. Sovrascrive il metodo paintComponent(Graphics g). È l'area di memoria
+    preposta al double buffering, in cui la CPU riversa i raster dei frame prima di eseguire il pointer swap per inviarli al monitor.
+
+Service GameFrame
+
+    Eredita da JFrame. Il suo unico scopo è eseguire la system call per richiedere l'handle della finestra all'OS, applicare le
+    costanti dimensionali (WINDOW_WIDTH, WINDOW_HEIGHT) e contenere il pannello di disegno.
+
+Service ResourceLoader:
+
+    Il modulo I/O. Eseguito preferibilmente una sola volta all'avvio (pre-fetching). Invia richieste di interruzione al controller del disco rigido
+    per leggere i binari .png o .wav, decodificandoli in matrici di pixel BufferedImage persistenti nella cache della RAM.
+
+Service Animator (o SpriteManager):
+    Il traduttore di stato. Riceve un input logico (es. "Il Player si muove a destra al frame 3") e restituisce alla View il puntatore esatto di
+    memoria in cui si trova la porzione di texture (subimage) da passare alla pipeline grafica in quel preciso millisecondo.
+
+Service SoundPlayer (o altro nome) (dentro viewer?)
+
+	Permette di riprodurre un suono specifico.
+
+Service MainFrame (o MainWindow)
+
+    Il modulo grafico principale.
+
+Interface Drawable
+
+    Il "contratto" di disegno. Ogni elemento che deve apparire a schermo la implementa, definendo esattamente come usare
+    il pennello (Graphics2D) per dipingere i propri dati. Il FrameBuilder riceverà liste di oggetti Drawable
+    (già filtrati dalla Viewport) e li stamperà ciecamente in sequenza.
+
+Service FrameBuilder
+
+    Si occupa di far aggiungere l'immagine corrispondente al pannello principale.
+
+#ELENCO DI TUTTI I COMANDI PRESENTI NEL PROGRAMMA (dentro controller)
+
+Ogni stato del gioco è associato a un controller dedicato, responsabile della gestione degli input validi in quella modalità.
+Anche qui ne ho fatti parecchi, uno per ogni modalita' diversa possibile nel gioco, di nuovo come per gli stati potremmo poter
+generalizzare nel caso notiamo pattern troppo spesso ripetuti o classi troppo semplici e quindi eccessivamente scomposte e separate.
+Per sicurezza ho messo tutte quelle che mi venivano in mente.
+
+
+Controller GameController(deprecato, svolge il ruolo di gamestate)
+
+	coordina stati, input ed eventi del gioco, assicurando che ogni azione venga gestita nel contesto corretto.
+
+Controller InputHandler
+
+	responsabile di intercettare gli eventi hardware generati dall'utente (pressione e rilascio dei tasti della tastiera).
+
+controller ElevatorRoomController
+
+	Comandi per le stanze ascensore, molto simili a Dungeon controll ma lo spazio e' diverso e in caso di ulteriori modifiche avviene tutto qui.
+
+controller DungeonController
+
+	Imposta i comandi di quando si sta in una stanza normale del Dungeon.
+
+controller CodeController
+
+	Comadi relativi all'interfaccia di decifrazione puzzle di quando si sta nella stanza ascensore.
+
+controller MenuController
+
+	Comandi relativi al menu iniziale di gioco
+
+controller EndGameController (o HallOfFameController)
+
+	Comandi per la hall of fame a fine partita e per tornare al menu o inziare una nuova run.
+
+controller MonitorRoomController
+
+	comandi per il terminale della stanza speciale monitor room.
+
+controller TerminalController
+
+	Comandi per i terminali presenti nelle stanze dei dungeon.
+
+controller EditorToolRoomController
+
+	Comandi per l'editor per costruire e personalizzare le stanze.
+
+controller PauseController
+
+	Comandi per quando si sta in pausa.
+
+(opzionale se serve) controller CinematicController
+
+	Comandi per la gestione delle cinematic qualora ci siano.
+
+(se serve) controller InputController
+
+	Permette di definire la logica dei comandi e le interazioni tra i comandi se ci sono.
+
+------------------------------------------------------------------------------------------------------------------------------------------------
+#FLUSSO DI ESECUZIONE
+
+Programma:
+
+Un modulo avvia le prime operazioni che il programma deve eseguire, assegna le caratteristche casuali della run corrente.
+
+Distribuisce le stanze.
+Per ogni stanza distribuita:
+
+
+
+- Sceglie la stanza tra quelle prestabilite.
+- Assegna il prossimo valore ID dal contatore per ogni mobile.
+- Assegna un carattere casuale per ogni robot.
+
+Il carattere del robot si genere in questo modo:
+- assegna un valore 0 o 1 se puo' sparare.
+- se puo' sparare allora assegna un valore random per decidere come sparare.
+- assegna un valore 0 o 1 se puo' voltarsi ecc...
+...
+altrimenti metodo mio...
+
+Per la monitor Room:
+La schermata della Monitor Room è organizzata come una matrice 8×4, per un totale di 32 caselle, indicizzate da 0 a 31.
+
+Per la generazione di una sequenza, vengono estratte casualmente:
+
+n caselle distinte tra loro (si parte con 3, +1 per ogni sequenza indovinata), scelte tra gli indici 0–31;
+
+n suoni distinti tra loro, scelti da un insieme di 32 suoni disponibili;
+
+n colori distinti tra loro, scelti da un insieme di 32 colori disponibili.
+
+Ogni elemento della sequenza è quindi rappresentato da una tripla (casella, suono, colore).
+Le prime 3 triple costituiranno il primo step della sequenza da memorizzare.
+
+Questa operazione di generazione viene ripetuta 29 volte, producendo una sequenza completa composta da 29 step, ognuno dei quali contiene n triple distinte. (partendo da 3)
+La procedura viene eseguita separatamente per entrambe le Monitor Room, che utilizzano sequenze indipendenti.
+
+- Distribuisce 2 (slot) stanze per sezione in posizioni casuali.
+- Aggiunge una stanza in posizione casuale in una sezione casuale FINO A CHE si esauriscono le 32 stanze a disposizione.
+- PER OGNI stanza delle sezioni estreme assegna una stanza casuale a passaggio singolo con annesso il corrispettivo passaggio di destra o di sinistra.
+- PER OGNI sezione intermedia assegna in una delle stanze disponibili casuali una stanza a doppio passaggio.
+- Distribuisce infine le stanze rimanenti casualmente sulle sezioni intermedie.
+
+Per distribuire i pezzi di codice e le passwords su mobili casuali:
+	i mobili sono numerati da 0 a n, viene generato un numero casuale a cui assegnare uno specifico mobile, i mobili sono numerati
+	(gli viene assegnato un ID) durante la fase di distribuzione delle stanze, per rintracciare il mobile si utilizza un sistema di ricerca che
+	controlla l'ID del primo mobile stanza per stanza di sezione per sezione, quando l'ID supera il valore ricercato ricerca nella stanza precedente
+	mobile per mobile fino a che trova l'ID giusto.
+
+- Distribuisce ogni pezzo di codice tra i mobili, generando un valore casuale diverso da quelli gia usciti.
+
+Per generare un valore random non gia uscito esistono diversi metodi: creare un dizionario dei valori, se la chiave ha gia un valore diverso da niente
+allora genera un nuovo numero random, oppure itera al valore prossimo successivo disponibile.
+Altra idea: il valore random viene attribuito all'indice di una lista. la lista contiene gli ID da prendere in considerazione. All'uscita di un valore
+random viene poppato l'indice corrispondente e il successivo numero random si fa sulla base della nuova lista ridotta.
+
+- Distribuisce tutte le password robot.
+- Distribuisce tutte le password ascensori.
+- Legge e inizializza la stanza in cui si trova (stanza di partenza, stanza ascensore 1).
+
+Carica le texture della stanza di partenza (stanza ascensore).
+
+- Carica texture muri.
+- Carica texture ascensore.
+- Carica texture player.
+- Carica texture pavimento.
+...
+- Carica texture mappa.
+- Carica loop-lampeggio zona corrente della mappa.
+
+Starting del gioco
+
+- Inizializza i "sensori eventi".
+
+Gli eventi sono dei sensori che permettono di interagire con il gioco stesso, un evento puo' essere quello posto ad esempio alla fine di un passaggio per
+far emettere il segnale di cambio stanza e avviare i procedimenti per visualizzarla, puo' essere quello di tocco di un robot che avvia una animazione, un
+suono e successivamente la morte del personaggio. 
+
+- Inizializza lo spawn del personaggio.
+
+- Attiva il suono della voce narrante che da il benvenuto.
+- Attiva la fisica di gioco (?).
+- Attiva i comandi relativi alla stanza ascensore (sara' uno stato?).
+
+Quando uno stato e' inizializzato si eseguono tutte le principali istruzioni che ne comportano, ad esempio: Stato menu: avvia comandi, avvia suono ecc.
+Stato cinematic: avvia animazione x, avvia comandi (per il salto della cinematic ad esempio), conteggia numero di animazione (esempio) ecc.
+Stato stanza dungeon: spanw robot, avvia comandi e caratteri robot ecc.
+Dopodiche a meno di un cambio di stato prima, l'unico modo per avviare un successivo cambio di stato e' attendere un evento. Gli eventi hanno effetto solo
+in questa fase, durante l'esecuzione delle istruzioni principali si e' "in fascia protetta", in altre parole gli eventi sono inizializzati in un momento 
+specifico e non possono creare conflitti con le istruzioni di un stato.
+
+
+Durante la partita:
+
+Evento cambio stanza:
+	- Cambia stato transazione x.
+
+Evento collisione robot:
+	- Cambia stato animazione k.
+
+Evento dirupo:
+	- Cambia stato morte x.
+
+Evento attivazione terminale stanza:
+	-Cambia stato interfaccia terminale stanza.
+
+
+
+Monitor Room:
+All'attivazione del terminale:
+- Cambia stato animazione sequenza.
+
+Stato terminale monitor room:
+
+
+
