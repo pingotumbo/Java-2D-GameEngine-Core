@@ -16,3 +16,5 @@ A modular 2D game engine core developed in Java, engineered with a focus on Clea
 ## Video & Engine Demonstration
 
 Below is a preview of the engine boot sequence, architecture initialization, and scene loading pipeline in action:
+
+![Engine Initialization Preview](docs/ImpossibleMissionEngineOpen.gif)
